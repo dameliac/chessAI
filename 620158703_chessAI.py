@@ -48,12 +48,12 @@ def load_images():
             sys.exit()
 
 # -----------------------------
-# board_utils.py
+# board_utils
 # -----------------------------
 def evaluate_board(board):
     """
     Evaluates the current board state and returns a score based on material.
-    Positive values favor white, negative values favor black.
+    Positive values favour white, negative values favour black.
     """
     if board.is_checkmate():
         return float('inf') if board.turn == chess.BLACK else float('-inf')
@@ -76,7 +76,7 @@ def evaluate_board(board):
     return value
 
 # -----------------------------
-# minimax.py
+# minimax
 # -----------------------------
 def minimax_alpha_beta(board, depth, alpha, beta, is_maximizing):
     """
@@ -227,8 +227,16 @@ def main():
     legal_moves_highlights = [] # list of (row, col) for legal destination squares to highlight
 
     game_over = False
-    ai_thinking = False
     AI_DEPTH = 3 # AI search depth
+
+    # --- NEW: Define AI's color and initialize ai_thinking ---
+    AI_COLOR = chess.WHITE # AI plays as White
+    ai_thinking = False
+
+    # Check if AI should make the very first move
+    if board.turn == AI_COLOR:
+        ai_thinking = True
+    # --- END NEW ---
 
     game_status_text = "" # Text for the status bar
 
@@ -239,82 +247,77 @@ def main():
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if not game_over:
-                    location = pygame.mouse.get_pos() # Get mouse click coordinates (x, y)
-                    col = location[0] // SQ_SIZE       # Convert x to column index
-                    row = location[1] // SQ_SIZE       # Convert y to row index
+                    # --- NEW: Only allow human clicks if it's the human's turn ---
+                    if board.turn != AI_COLOR:
+                        location = pygame.mouse.get_pos() # Get mouse click coordinates (x, y)
+                        col = location[0] // SQ_SIZE       # Convert x to column index
+                        row = location[1] // SQ_SIZE       # Convert y to row index
 
-                    clicked_pygame_square = (row, col) # Pygame (row, col) of the clicked square
-                    clicked_chess_square = chess.square(col, 7 - row) # Convert to python-chess square
+                        clicked_pygame_square = (row, col) # Pygame (row, col) of the clicked square
+                        clicked_chess_square = chess.square(col, 7 - row) # Convert to python-chess square
 
-                    # Debugging prints (uncomment to see in console)
-                    # print(f"Clicked Pygame: {clicked_pygame_square}, Chess: {chess.square_name(clicked_chess_square)}")
-
-                    if sq_selected == clicked_pygame_square: # User clicked the same square twice (deselect)
-                        sq_selected = ()
-                        player_clicks = []
-                        legal_moves_highlights = []
-                    elif not sq_selected: # First click: try to select a piece
-                        piece_on_clicked_square = board.piece_at(clicked_chess_square)
-                        if piece_on_clicked_square and piece_on_clicked_square.color == board.turn:
-                            # Valid first click: select the piece and find its legal moves
-                            sq_selected = clicked_pygame_square
-                            player_clicks.append(sq_selected)
-                            legal_moves_highlights = []
-                            for move in board.legal_moves:
-                                if move.from_square == clicked_chess_square:
-                                    target_row = 7 - chess.square_rank(move.to_square)
-                                    target_col = chess.square_file(move.to_square)
-                                    legal_moves_highlights.append((target_row, target_col))
-                        else: # Clicked on an empty square or opponent's piece first (invalid selection)
-                            sq_selected = () # Ensure nothing is selected
-                            player_clicks = []
-                            legal_moves_highlights = []
-                    else: # Second click: attempt to make a move
-                        player_clicks.append(clicked_pygame_square)
-                        start_row, start_col = player_clicks[0]
-                        end_row, end_col = player_clicks[1]
-
-                        start_square_uci = chess.square_name(chess.square(start_col, 7 - start_row))
-                        end_square_uci = chess.square_name(chess.square(end_col, 7 - end_row))
-                        move_uci = start_square_uci + end_square_uci
-
-                        # Debugging prints (uncomment to see in console)
-                        # print(f"Attempting move UCI: {move_uci}")
-
-                        # Pawn promotion handling: default to queen if pawn reaches last rank
-                        # This assumes the piece on the start square is indeed a pawn
-                        piece_on_start_square = board.piece_at(chess.parse_square(start_square_uci))
-                        if piece_on_start_square and piece_on_start_square.piece_type == chess.PAWN:
-                            if (board.turn == chess.WHITE and end_row == 0) or \
-                               (board.turn == chess.BLACK and end_row == 7):
-                                move_uci += 'q' # Append 'q' for queen promotion
-
-                        try:
-                            move = chess.Move.from_uci(move_uci)
-                            # Debugging print (uncomment to see in console)
-                            # print(f"Parsed move: {move}, Is legal: {move in board.legal_moves}")
-
-                            if move in board.legal_moves:
-                                board.push(move) # Make the move on the chess board
-                                game_over = board.is_game_over() # Check if game ended
-                                sq_selected = () # Reset selection
-                                player_clicks = [] # Clear clicks
-                                legal_moves_highlights = [] # Clear highlights after successful move
-
-                                # If game is not over and it's AI's turn (AI is White in this setup)
-                                if not game_over and board.turn == chess.WHITE:
-                                    ai_thinking = True
-                            else:
-                                # If illegal move, keep the first click selection to allow user to try another destination
-                                print("Illegal move. Try again.")
-                                player_clicks = [sq_selected] # Keep the first clicked square in player_clicks
-                                # legal_moves_highlights remains the same, showing valid moves for the selected piece
-                        except ValueError as e:
-                            # If UCI format is invalid, clear everything to force re-selection
-                            print(f"Invalid move format or parsing error: {e}. Input UCI: {move_uci}")
+                        if sq_selected == clicked_pygame_square: # User clicked the same square twice (deselect)
                             sq_selected = ()
                             player_clicks = []
                             legal_moves_highlights = []
+                        elif not sq_selected: # First click: try to select a piece
+                            piece_on_clicked_square = board.piece_at(clicked_chess_square)
+                            # Ensure human can only select their own pieces
+                            if piece_on_clicked_square and piece_on_clicked_square.color == board.turn:
+                                # Valid first click: select the piece and find its legal moves
+                                sq_selected = clicked_pygame_square
+                                player_clicks.append(sq_selected)
+                                legal_moves_highlights = []
+                                for move in board.legal_moves:
+                                    if move.from_square == clicked_chess_square:
+                                        target_row = 7 - chess.square_rank(move.to_square)
+                                        target_col = chess.square_file(move.to_square)
+                                        legal_moves_highlights.append((target_row, target_col))
+                            else: # Clicked on an empty square or opponent's piece first (invalid selection)
+                                sq_selected = () # Ensure nothing is selected
+                                player_clicks = []
+                                legal_moves_highlights = []
+                        else: # Second click: attempt to make a move
+                            player_clicks.append(clicked_pygame_square)
+                            start_row, start_col = player_clicks[0]
+                            end_row, end_col = player_clicks[1]
+
+                            start_square_uci = chess.square_name(chess.square(start_col, 7 - start_row))
+                            end_square_uci = chess.square_name(chess.square(end_col, 7 - end_row))
+                            move_uci = start_square_uci + end_square_uci
+
+                            # Pawn promotion handling: default to queen if pawn reaches last rank
+                            piece_on_start_square = board.piece_at(chess.parse_square(start_square_uci))
+                            if piece_on_start_square and piece_on_start_square.piece_type == chess.PAWN:
+                                if (board.turn == chess.WHITE and end_row == 0) or \
+                                   (board.turn == chess.BLACK and end_row == 7):
+                                    move_uci += 'q' # Append 'q' for queen promotion
+
+                            try:
+                                move = chess.Move.from_uci(move_uci)
+                                if move in board.legal_moves:
+                                    board.push(move) # Make the move on the chess board
+                                    game_over = board.is_game_over() # Check if game ended
+                                    sq_selected = () # Reset selection
+                                    player_clicks = [] # Clear clicks
+                                    legal_moves_highlights = [] # Clear highlights after successful move
+
+                                    # --- NEW: Check if it's AI's turn after human move ---
+                                    if not game_over and board.turn == AI_COLOR:
+                                        ai_thinking = True
+                                    # --- END NEW ---
+                                else:
+                                    # If illegal move, keep the first click selection to allow user to try another destination
+                                    print("Illegal move. Try again.")
+                                    player_clicks = [sq_selected] # Keep the first clicked square in player_clicks
+                            except ValueError as e:
+                                # If UCI format is invalid, clear everything to force re-selection
+                                print(f"Invalid move format or parsing error: {e}. Input UCI: {move_uci}")
+                                sq_selected = ()
+                                player_clicks = []
+                                legal_moves_highlights = []
+                    else:
+                        print("It's the AI's turn!") # Inform user if they click when it's AI's turn
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r: # 'r' key to reset the board
                     board = chess.Board()
@@ -323,22 +326,35 @@ def main():
                     sq_selected = ()
                     player_clicks = []
                     legal_moves_highlights = []
+                    # --- NEW: Re-check initial AI turn after reset ---
+                    if board.turn == AI_COLOR:
+                        ai_thinking = True
+                    # --- END NEW ---
                     print("Board reset!")
                 if event.key == pygame.K_z: # 'z' key to undo the last move(s)
                     if board.fullmove_number > 1: # Ensure there's at least one move to undo
-                        board.pop() # Undo human's move
-                        if board.fullmove_number > 1 and not board.turn == chess.WHITE: # If AI just moved, undo its move too
+                        # Undo human's move
+                        if board.turn != AI_COLOR: # If it was human's turn, undo their move
+                            board.pop()
+                        # If AI just moved (and it's now human's turn), undo its move too
+                        if board.fullmove_number > 1 and board.turn == AI_COLOR:
                              board.pop()
+
                         game_over = False
                         ai_thinking = False
                         sq_selected = ()
                         player_clicks = []
                         legal_moves_highlights = []
+                        # --- NEW: Re-check AI turn after undo ---
+                        if not game_over and board.turn == AI_COLOR:
+                            ai_thinking = True
+                        # --- END NEW ---
                         print("Last move(s) undone.")
+
 
         # AI's turn to make a move
         if not game_over and ai_thinking:
-            print("\nAI (White) is thinking...")
+            print(f"\nAI ({'White' if AI_COLOR == chess.WHITE else 'Black'}) is thinking...")
             ai_move = get_best_move(board, AI_DEPTH)
             if ai_move:
                 board.push(ai_move) # Make the AI's move
@@ -347,7 +363,7 @@ def main():
             else:
                 print("AI could not find a valid move. Game over.")
                 game_over = True # End game if AI has no valid moves
-            ai_thinking = False
+            ai_thinking = False # AI has finished thinking and made its move
 
         # --- Update Game Status Text ---
         if not game_over:
